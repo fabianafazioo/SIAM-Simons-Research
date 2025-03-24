@@ -198,8 +198,9 @@ def FakeMeasures(features, label, optional=None):
     def chi_squared_fvl(features, label):
             
         # Combining features and label
-        df = features # Re-naming the features dataframe to 'df'
-        df['user_label'] = label # Adding label as last column to df
+        df = features.copy()
+        df[label.name] = label  # Preserving the original column name of label (debugged)
+        df = df[[col for col in df.columns if col != label.name] + [label.name]] # Label becomes last column
     
         # Number of features, excluding label
         var_count = len(df.columns)-1
@@ -286,8 +287,9 @@ def FakeMeasures(features, label, optional=None):
     def anova_fvl(features, label):
         
         # Combining features and label
-        df = features
-        df['user_label'] = label
+        df = features.copy()
+        df[label.name] = label  # Preserving the original column name of label (debugged)
+        df = df[[col for col in df.columns if col != label.name] + [label.name]] # Label becomes last column
     
         # Number of features, excluding label
         var_count = len(features.columns)-1
@@ -377,8 +379,9 @@ def FakeMeasures(features, label, optional=None):
     def KWH_fvl(features, label):
         
         # Combining features and label
-        df = features
-        df['user_label'] = label
+        df = features.copy()
+        df[label.name] = label  # Preserving the original column name of label (debugged)
+        df = df[[col for col in df.columns if col != label.name] + [label.name]] # Label becomes last column
     
         # Number of features, excluding label
         var_count = len(features.columns)-1
