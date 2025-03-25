@@ -84,21 +84,14 @@ import matplotlib.pyplot as plt
 #################### DO NOT UNCOMMENT!!!!!!!! #################################
 
 
-
 def FakeDifferences(data1, data2, optional=None):
-    # Initialize empty dataframes for numerical and categorical data for both datasets
-    numerical_df1 = pd.DataFrame()
-    categorical_df1 = pd.DataFrame()
-    numerical_df2 = pd.DataFrame()
-    categorical_df2 = pd.DataFrame()
-    
     # Function to split data into numerical and categorical dataframes
     def split_data(data, optional):
         numerical_df = pd.DataFrame()
         categorical_df = pd.DataFrame()
         
         if optional is None:
-            print("Optional parameter not provided. Assuming integer values are categorical")
+            print("Optional parameter not provided. Assuming integer values are categorical.")
             numerical_df = data.select_dtypes(include=['float', 'float64'])
             categorical_df = data.select_dtypes(exclude=['float', 'float64'])
         else:
@@ -109,26 +102,44 @@ def FakeDifferences(data1, data2, optional=None):
 
             if len(optional) == len(data.columns):
                 for i in range(len(optional)):
-                    if optional[i] == True:
+                    if optional[i] == False:  # FALSE = Numerical
                         numerical.append(data.iloc[:, i])
                         numerical_colnames.append(data.columns[i])
                     else:
-                        categorical.append(data.iloc[:, i])
+                        categorical.append(data.iloc[:, i])  # TRUE = Categorical
                         categorical_colnames.append(data.columns[i])
-                numerical_df = pd.DataFrame(np.transpose(numerical))
-                categorical_df = pd.DataFrame(np.transpose(categorical))
-                numerical_df.columns = numerical_colnames
-                categorical_df.columns = categorical_colnames
+
+                # Convert lists to DataFrames only if they contain data
+                if numerical:
+                    numerical_df = pd.DataFrame(np.array(numerical).T, columns=numerical_colnames)
+                if categorical:
+                    categorical_df = pd.DataFrame(np.array(categorical).T, columns=categorical_colnames)
             else:
-                print("The length of data and optional are different.")
-        
+                print("Error: The length of 'optional' does not match the number of columns in the dataset.")
+
         return numerical_df, categorical_df
 
     # Split both datasets
     numerical_df1, categorical_df1 = split_data(data1, optional)
     numerical_df2, categorical_df2 = split_data(data2, optional)
-    
-    # Print numerical and categorical dataframes for both datasets
+
+    # Check if any dataframe is empty
+    if numerical_df1.empty:
+        print("Warning: Numerical DataFrame 1 is empty.")
+    if categorical_df1.empty:
+        print("Warning: Categorical DataFrame 1 is empty.")
+    if numerical_df2.empty:
+        print("Warning: Numerical DataFrame 2 is empty.")
+    if categorical_df2.empty:
+        print("Warning: Categorical DataFrame 2 is empty.")
+
+    # Check if numerical and categorical dataframes match across datasets
+    if set(numerical_df1.columns) != set(numerical_df2.columns):
+        print("Warning: Numerical DataFrames have different column structures.")
+    if set(categorical_df1.columns) != set(categorical_df2.columns):
+        print("Warning: Categorical DataFrames have different column structures.")
+
+    # Print numerical and categorical dataframes for debugging
     print("\nNumerical DataFrame 1:")
     print(numerical_df1)
     print("\nCategorical DataFrame 1:")
@@ -139,11 +150,11 @@ def FakeDifferences(data1, data2, optional=None):
     print("\nCategorical DataFrame 2:")
     print(categorical_df2)
     
-    
 ############################## Feature Distributions  ##################################
 
     def feat_dist(numerical_df1, categorical_df1, numerical_df2, categorical_df2):
         
+        # Histogram function
         def generate_distribution_histogram(dataframe, column_name, number_bins, 
                                     alpha, color, edgecolor, label_name,
                                     density = True,
@@ -155,124 +166,132 @@ def FakeDifferences(data1, data2, optional=None):
             plt.xlabel(x_axis_label)
             plt.ylabel(y_axis_label)
             plt.legend(loc='upper left')
-    
-
+        # Mann-Whitney U Test function
         def mann_whitney_u_test(distribution_1, distribution_2):
+            try:
+                u_statistic, p_value = stats.mannwhitneyu(distribution_1, distribution_2)
+            
+                #Print the results
+                print('U-Statistic: ', u_statistic)
+                print('p-value: ', p_value)
+                print()
+            except ValueError as e:
+                print("Mann-Whitney U Test could not be performed:", e)
 
-            u_statistic, p_value = stats.mannwhitneyu(distribution_1, distribution_2)
-        
-            #Print the results
-            print('U-Statistic: ', u_statistic)
-            print('p-value: ', p_value)
-            print()
+        # Check for empty dataframes across numerical datasets
+        if numerical_df1.empty or numerical_df2.empty:
+            print("Skipping numerical distribution comparison due to missing numerical data.\n")
+        else:
+            num_X_train1 = numerical_df1.iloc[:, :-1] if numerical_df1.shape[1] > 1 else numerical_df1
+            num_X_train2 = numerical_df2.iloc[:, :-1] if numerical_df2.shape[1] > 1 else numerical_df2
             
-        # Want all of the columns except the label column
-        num_X_train1 = numerical_df1.iloc[:, :-1]
-    
-        num_X_train2 = numerical_df2.iloc[:, :-1]
+            # Running feature distribution analyses for NUMERICAL data
+            for column in num_X_train1.columns.intersection(num_X_train2.columns):
+                
+                # Calculate common bins based on the range of values in both datasets for this column
+                combined_min = min(np.min(num_X_train1[column]), np.min(num_X_train2[column]))
+                combined_max = max(np.max(num_X_train1[column]), np.max(num_X_train2[column]))
+                bins = np.linspace(combined_min, combined_max, 10)  # Adjust the number of bins as needed
         
-        cat_X_train1 = categorical_df1.iloc[:, :-1]
-        
-        cat_X_train2 = categorical_df2.iloc[:, :-1]
+                generate_distribution_histogram(dataframe = num_X_train1, 
+                                                column_name = column, 
+                                                number_bins = bins, 
+                                                alpha = 0.8, 
+                                                color = 'teal', 
+                                                edgecolor = 'black',
+                                                label_name = 'Original',
+                                                density = True,
+                                                title=f'Column {column}',
+                                                x_axis_label = 'Values', 
+                                                y_axis_label = 'Frequencies')
+            
+                generate_distribution_histogram(dataframe = num_X_train2, 
+                                                column_name = column, 
+                                                number_bins = bins, 
+                                                alpha = 0.3, 
+                                                color = 'darkviolet', 
+                                                edgecolor = 'black',
+                                                label_name = 'Orig + Aug',
+                                                density = True,
+                                                title=f'Column {column}',
+                                                x_axis_label = 'Values', 
+                                                y_axis_label = 'Frequencies')
 
+                plt.show()
         
-        for column in num_X_train1.columns:
+                print(f"Column {column}:")
+                mann_whitney_u_test(list(num_X_train1[column]), list(num_X_train2[column]))
             
-            # Calculate common bins based on the range of values in both datasets for this column
-            combined_min = min(np.min(num_X_train1[column]), np.min(num_X_train2[column]))
-            combined_max = max(np.max(num_X_train1[column]), np.max(num_X_train2[column]))
-            bins = np.linspace(combined_min, combined_max, 10)  # Adjust the number of bins as needed
-       
-            generate_distribution_histogram(dataframe = num_X_train1, 
-                                            column_name = column, 
-                                            number_bins = bins, 
-                                            alpha = 0.8, 
-                                            color = 'teal', 
-                                            edgecolor = 'black',
-                                            label_name = 'Original',
-                                            density = True,
-                                            title=f'Column {column}',
-                                            x_axis_label = 'Values', 
-                                            y_axis_label = 'Frequencies')
-           
-            generate_distribution_histogram(dataframe = num_X_train2, 
-                                            column_name = column, 
-                                            number_bins = bins, 
-                                            alpha = 0.3, 
-                                            color = 'darkviolet', 
-                                            edgecolor = 'black',
-                                            label_name = 'Orig + Aug',
-                                            density = True,
-                                            title=f'Column {column}',
-                                            x_axis_label = 'Values', 
-                                            y_axis_label = 'Frequencies')
+    if categorical_df1.empty or categorical_df2.empty:
+        print("Skipping categorical distribution comparison due to missing categorical data.\n")
+    else:
+        cat_X_train1 = categorical_df1.iloc[:, :-1] if categorical_df1.shape[1] > 1 else categorical_df1
+        cat_X_train2 = categorical_df2.iloc[:, :-1] if categorical_df2.shape[1] > 1 else categorical_df2
 
-            plt.show()
-    
-            print(f"Column {column}:")
-            mann_whitney_u_test(list(num_X_train1[column]), list(num_X_train2[column]))
-           
-        for column in cat_X_train1.columns:
-            
-            value_counts1 = cat_X_train1.loc[:, column].value_counts(normalize=True).sort_index()
-            value_counts2 = cat_X_train2.loc[:, column].value_counts(normalize=True).sort_index()
-            
-            # Align indices
+        for column in cat_X_train1.columns.intersection(cat_X_train2.columns):
+            value_counts1 = cat_X_train1[column].value_counts(normalize=True).sort_index()
+            value_counts2 = cat_X_train2[column].value_counts(normalize=True).sort_index()
+
             all_categories = value_counts1.index.union(value_counts2.index)
             value_counts1 = value_counts1.reindex(all_categories, fill_value=0)
-            
+            value_counts2 = value_counts2.reindex(all_categories, fill_value=0)
+
             print(f"Column {column}:")
-            print("df1:", value_counts1.values)  # Print just the values for cat_X_train1
-            print("df2:", value_counts2.values)  # Print just the values for cat_X_train2
-            
-            # Compute the L2 norm (Euclidean norm) of the difference between the arrays
-            L2_norm = np.linalg.norm(value_counts1.values - value_counts2.values, ord=2)
-            L2_norm = L2_norm / np.linalg.norm(value_counts1.values, ord=2)
-            print("Euclidean norm of difference:", L2_norm)  # Print the differences
+            print("df1:", value_counts1.values)
+            print("df2:", value_counts2.values)
+
+            L2_norm = np.linalg.norm(value_counts1.values - value_counts2.values, ord=2) / \
+                      np.linalg.norm(value_counts1.values, ord=2)
+            print("Euclidean norm of difference:", L2_norm)
             print()
             
     print("-------------Feature Distribution Comparisons-------------------- \n")
+
     feat_dist(numerical_df1, categorical_df1, numerical_df2, categorical_df2)
                     
-        
-        
-      
     ############################## Correlation between columns (Feature vs Feature)  ##################################
     
     # Function to find correlation between numerical features
     def num_corr(X_train_numerical):
+        if X_train_numerical.empty:  # Checking if X_train_numerical is empty
+        print("Warning: Numerical dataframe is empty. Skipping correlation between numerical columns (FvF).")
+        return None  # Return None if empty
+
         matrix = X_train_numerical.corr(method='pearson')
         print("---------------------------Correlation Matrix------------------------- \n", matrix)
         return matrix
     
-    # Correlation matrix for numerical data1
-    correlation_matrix1 = num_corr(numerical_df1)
-    correlation_df1 = pd.DataFrame(correlation_matrix1)
-    print("\nCorrelation DataFrame 1:")
-    print(correlation_df1)
-    print(f"Shape: {correlation_df1.shape}")
-    
-    # Correlation matrix for numerical data2
-    correlation_matrix2 = num_corr(numerical_df2)
-    correlation_df2 = pd.DataFrame(correlation_matrix2)
-    print("\nCorrelation DataFrame 2:")
-    print(correlation_df2)
-    print(f"Shape: {correlation_df2.shape}")
-    
-    # Convert the dataframes to numpy arrays
-    matrix1 = correlation_df1.to_numpy()
-    matrix2 = correlation_df2.to_numpy()
+    # Check if numerical_df1 and numerical_df2 are empty before proceeding
+    if numerical_df1.empty or numerical_df2.empty:
+        print("Error: One or both numerical datasets are empty. Correlation analysis skipped.")  # ✅ Error message
+    else:
+        # Correlation matrix for numerical data1
+        correlation_matrix1 = num_corr(numerical_df1)
+        correlation_df1 = pd.DataFrame(correlation_matrix1)
+        if correlation_df1 is not None:
+            print("\nCorrelation DataFrame 1:")
+            print(correlation_df1)
+            print(f"Shape: {correlation_df1.shape}")
 
-    # Compute the Frobenius norm of the difference between the matrices
-    frobenius_abs = np.linalg.norm(matrix1 - matrix2, ord='fro')   # Absolute error with Frobenius norm
-    frobenius_rel = frobenius_abs / np.linalg.norm(matrix1, ord='fro')    # Relative error with Frobenius norm
+        # Correlation matrix for numerical data2
+        correlation_matrix2 = num_corr(numerical_df2)
+        correlation_df2 = pd.DataFrame(correlation_matrix2)
+        if correlation_df2 is not None:
+            print("\nCorrelation DataFrame 2:")
+            print(correlation_df2)
+            print(f"Shape: {correlation_df2.shape}")
+        # Checking correlation matrices exist before proceeding
+        if correlation_df1 is not None and correlation_df2 is not None:
+            # Convert the dataframes to numpy arrays
+            matrix1 = correlation_df1.to_numpy()
+            matrix2 = correlation_df2.to_numpy()
 
-    print(f"Frobenius norm (absolute error): {frobenius_abs:.3f}")
-    print(f"Frobenius norm (relative error): {frobenius_rel:.3f}")
+            # Compute the Frobenius norm of the difference between the matrices
+            frobenius_abs = np.linalg.norm(matrix1 - matrix2, ord='fro')   # Absolute error with Frobenius norm
+            frobenius_rel = frobenius_abs / np.linalg.norm(matrix1, ord='fro')    # Relative error with Frobenius norm
 
-
-
-
+            print(f"Frobenius norm (absolute error): {frobenius_abs:.3f}")
+            print(f"Frobenius norm (relative error): {frobenius_rel:.3f}")
 
     ################################# Chi-Square (Feature vs Feature)  ##########################################
     
@@ -313,31 +332,28 @@ def FakeDifferences(data1, data2, optional=None):
 
         return p_values_df
 
-    # Chi-Square test for categorical data
-    p_values_df1 = chi_squared_fvf(categorical_df1)
-    p_values_df2 = chi_squared_fvf(categorical_df2)
+    if categorical_df1.empty or categorical_df2.empty:
+        print("Error: One or both categorical datasets are empty. Skipping categorical analysis.")  # Error message
+    else:
+        # Chi-Square test for categorical data
+        p_values_df1 = chi_squared_fvf(categorical_df1)
+        p_values_df2 = chi_squared_fvf(categorical_df2)
 
-    # Create a new DataFrame with True/False based on the p_value condition
-    print("----------- Chi-Square (F vs F) True and False for Data1 ------------")
-    p_value_df1 = p_values_df1 < 0.05
-    print(p_value_df1)
+        # Create a new DataFrame with True/False based on the p_value condition
+        print("----------- Chi-Square (F vs F) True and False for Data1 ------------")
+        p_value_df1 = p_values_df1 < 0.05
+        print(p_value_df1)
 
-    print("----------- Chi-Square (F vs F) True and False for Data2 ------------")
-    p_value_df2 = p_values_df2 < 0.05
-    print(p_value_df2)
+        print("----------- Chi-Square (F vs F) True and False for Data2 ------------")
+        p_value_df2 = p_values_df2 < 0.05
+        print(p_value_df2)
 
-    # Count the changes between the two DataFrames
-    changes = (p_value_df1 != p_value_df2).sum().sum()
+        # Count the changes between the two DataFrames
+        changes = (p_value_df1 != p_value_df2).sum().sum()
 
-    # Display the number of changes
-    print(f"Number of changes between data1 and data2 in Chi-Square (F vs F): {changes}")
+        # Display the number of changes
+        print(f"Number of changes between data1 and data2 in Chi-Square (F vs F): {changes}")
 
-
-
-
-
-
-    
     ################################### Chi-Square (Feature vs Label)  ##########################################
     # Extract y_train (label column)
     y_train1 = data1.iloc[:, 12]
@@ -380,25 +396,28 @@ def FakeDifferences(data1, data2, optional=None):
 
         return results_df
     
-    results_df1 = chi_squared_fvl(categorical_df1, y_train1)
-    results_df2 = chi_squared_fvl(categorical_df2, y_train2)
+    if categorical_df1.empty or categorical_df2.empty:
+        print("Error: One or both categorical datasets are empty. Skipping categorical analysis.")  # ✅ Error message
+    else:
+        results_df1 = chi_squared_fvl(categorical_df1, y_train1)
+        results_df2 = chi_squared_fvl(categorical_df2, y_train2)
 
-    print("----------- Chi-Square (F vs L) True and False for Data1 ------------")
-    p_value_fvl_df1 = results_df1['P-Value'] < 0.05
-    print(p_value_fvl_df1)
+        print("----------- Chi-Square (F vs L) True and False for Data1 ------------")
+        p_value_fvl_df1 = results_df1['P-Value'] < 0.05
+        print(p_value_fvl_df1)
 
-    print("----------- Chi-Square (F vs L) True and False for Data2 ------------")
-    p_value_fvl_df2 = results_df2['P-Value'] < 0.05
-    print(p_value_fvl_df2)
-    
-    # Count the changes between the two DataFrames
-    changes = (p_value_fvl_df1 != p_value_fvl_df2).sum()
+        print("----------- Chi-Square (F vs L) True and False for Data2 ------------")
+        p_value_fvl_df2 = results_df2['P-Value'] < 0.05
+        print(p_value_fvl_df2)
+        
+        # Count the changes between the two DataFrames
+        changes = (p_value_fvl_df1 != p_value_fvl_df2).sum()
 
-    # Display the number of changes
-    print(f"Number of changes between data1 and data2 in Chi-Square (F vs L): {changes}")
-    
-    
-    
+        # Display the number of changes
+        print(f"Number of changes between data1 and data2 in Chi-Square (F vs L): {changes}")
+        
+        
+        
     ###########################################################################
 
 
